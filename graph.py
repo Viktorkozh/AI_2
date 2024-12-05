@@ -1,64 +1,85 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import json
-from itertools import permutations
-
-with open("elem.json", "r", encoding="utf-8") as file:
-    data = json.load(file)
-
-selected_ids = {
-    "8",
-    "9",
-    "2",
-    "15",
-    "6",
-    "1",
-    "3",
-    "7",
-    "13",
-    "18",
-}  # Выбор 10-ти городов из 20-ти
-
-cities = {}
-distances = {}
-
-for item in data:
-    if "label" in item["data"]:
-        if item["data"]["id"] in selected_ids:
-            cities[item["data"]["id"]] = item["data"]["label"]
-    elif "source" in item["data"]:
-        source = item["data"]["source"]
-        target = item["data"]["target"]
-        if source in selected_ids and target in selected_ids:
-            weight = item["data"]["weight"]
-            distances[(source, target)] = weight
-            distances[(target, source)] = weight
+from collections import deque
 
 
-def route_length(route):
-    return sum(
-        distances.get((route[i], route[i + 1]), float("inf"))
-        for i in range(len(route) - 1)
-    )
+class CityProblem:
+    def __init__(self, cities, distances, initial, goal):
+        self.cities = cities
+        self.distances = distances
+        self.initial = initial
+        self.goal = goal
+
+    def actions(self, state):
+        return [target for target in self.cities if (state, target) in self.distances]
+
+    def result(self, state, action):
+        return action
+
+    def is_goal(self, state):
+        return state == self.goal
+
+
+def breadth_first_search(problem):
+    node = problem.initial
+    if problem.is_goal(node):
+        return [node]
+
+    frontier = deque([node])
+    came_from = {node: None}
+
+    while frontier:
+        current = frontier.popleft()
+
+        for action in problem.actions(current):
+            if action not in came_from:
+                came_from[action] = current
+                if problem.is_goal(action):
+                    return reconstruct_path(came_from, action)
+                frontier.append(action)
+
+    return None
+
+
+def reconstruct_path(came_from, current):
+    path = []
+    while current is not None:
+        path.append(current)
+        current = came_from[current]
+    path.reverse()
+    return path
 
 
 if __name__ == "__main__":
-    all_routes = permutations(cities.keys())
+    with open("elem.json", "r", encoding="utf-8") as file:
+        data = json.load(file)
 
-    shortest_route = min(all_routes, key=route_length)
-    shortest_distance = route_length(shortest_route)
+    selected_ids = {"8", "9", "2", "15", "6", "1", "3", "7", "13", "18"}
 
-    print("Выбранные города:")
-    for city_id, city_name in cities.items():
-        print(f"{city_id}: {city_name}")
+    cities = {}
+    distances = {}
 
-    print("\nКратчайший маршрут:")
-    print(" -> ".join(cities[city] for city in shortest_route))
-    print(f"Общая длина маршрута: {shortest_distance} км")
+    for item in data:
+        if "label" in item["data"]:
+            if item["data"]["id"] in selected_ids:
+                cities[item["data"]["id"]] = item["data"]["label"]
+        elif "source" in item["data"]:
+            source = item["data"]["source"]
+            target = item["data"]["target"]
+            if source in selected_ids and target in selected_ids:
+                weight = item["data"]["weight"]
+                distances[(source, target)] = weight
+                distances[(target, source)] = weight
 
-    print("Расстояния:")
-    for city1 in cities:
-        for city2 in cities:
-            if city1 != city2:
-                distance = distances.get((city1, city2), "Нет.")
-                print(f"{city1} -> {city2}: {distance}")
+    start_city = "8"
+    goal_city = "15"
+
+    problem = CityProblem(cities, distances, start_city, goal_city)
+    solution = breadth_first_search(problem)
+
+    if solution is None:
+        print("Решение не найдено.")
+    else:
+        print("Кратчайший путь:")
+        print(" -> ".join(cities[city] for city in solution))
